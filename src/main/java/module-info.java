@@ -5,6 +5,9 @@ module github.tilcob.app.listmerging {
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;
     requires com.fasterxml.jackson.databind;
+    requires org.apache.poi.ooxml;
+    requires com.opencsv;
+    requires org.slf4j;
 
     opens github.tilcob.app.listmerging.model to com.fasterxml.jackson.databind;
     opens github.tilcob.app.listmerging to javafx.fxml;
