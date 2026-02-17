@@ -4,7 +4,11 @@ module github.tilcob.app.listmerging {
 
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;
+    requires com.fasterxml.jackson.databind;
 
+    opens github.tilcob.app.listmerging.model to com.fasterxml.jackson.databind;
     opens github.tilcob.app.listmerging to javafx.fxml;
     exports github.tilcob.app.listmerging;
+    exports github.tilcob.app.listmerging.controller;
+    opens github.tilcob.app.listmerging.controller to javafx.fxml;
 }
