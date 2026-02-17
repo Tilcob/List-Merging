@@ -1,8 +1,10 @@
 package github.tilcob.app.listmerging.service;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvException;
+import github.tilcob.app.listmerging.model.HeaderDefinition;
 import org.apache.poi.ss.usermodel.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,72 +18,78 @@ import java.util.stream.IntStream;
 public class MergeService {
     private static final Logger log = LoggerFactory.getLogger(MergeService.class);
 
-    public Map<List<String>, Integer> merge(List<File> files) throws IOException, CsvException {
-        Map<List<String>, Integer> result = new HashMap<>();
+    public Map<HeaderDefinition, Map<List<String>, Integer>> merge(List<File> files, List<HeaderDefinition> headers)
+            throws IOException, CsvException {
+        Map<HeaderDefinition, Map<List<String>, Integer>> result = new LinkedHashMap<>();
 
         for (File file : files) {
             FileType fileType = detect(file);
-            Map<List<String>, Integer> fileResult = switch (fileType) {
-                case EXCEL -> readExcel(file);
-                case CSV -> readCsv(file);
+            FileReadResult fileResult = switch (fileType) {
+                case EXCEL -> readExcel(file, headers);
+                case CSV -> readCsv(file, headers);
             };
-            mergeMaps(result, fileResult);
+            Map<List<String>, Integer> bucket =
+                    result.computeIfAbsent(fileResult.header(), k -> new HashMap<>());
+
+            fileResult.counts().forEach((row, count) -> bucket.merge(row, count, Integer::sum));
         }
         return result;
     }
 
-    private static <K> void mergeMaps(Map<K, Integer> into, Map<K, Integer> from) {
-        from.forEach((key, value) -> into.merge(key, value, Integer::sum));
-    }
-
-    private Map<List<String>, Integer> readExcel(File file) throws IOException {
+    private FileReadResult readExcel(File file, List<HeaderDefinition> headers) throws IOException {
         try (Workbook workbook = WorkbookFactory.create(file)) {
-            return mergeRows(workbook);
+            Sheet sheet = workbook.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+
+            Row headerRowPoi = sheet.getRow(0);
+            if (headerRowPoi == null) {
+                return new FileReadResult(new HeaderDefinition("Empty", List.of()), Map.of());
+            }
+
+            List<String> headerRow = toStringRow(headerRowPoi, fmt);
+            HeaderDefinition chosen = chooseHeader(headerRow, headers);
+
+            Map<List<String>, Integer> counts = new HashMap<>();
+            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+
+                List<String> cells = toStringRow(row, fmt);
+                if (isBlankRow(cells)) continue;
+
+                counts.merge(List.copyOf(cells), 1, Integer::sum);
+            }
+
+            return new FileReadResult(chosen, counts);
+        } catch (InvalidFormatException e) {
+            throw new IOException("Invalid Excel format: " + file.getName(), e);
         }
     }
 
-    private Map<List<String>, Integer> readCsv(File file) throws CsvException, IOException {
-        Map<List<String>, Integer> result = new HashMap<>();
+    private FileReadResult readCsv(File file, List<HeaderDefinition> headers) throws CsvException, IOException {
         try (var reader = new CSVReaderBuilder(
                 Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8))
-                .withCSVParser(new CSVParserBuilder()
-                        .withSeparator(';').build()).build()
+                .withCSVParser(new CSVParserBuilder().withSeparator(';').build())
+                .build()
         ) {
             List<String[]> rows = reader.readAll();
+            if (rows.isEmpty()) {
+                return new FileReadResult(new HeaderDefinition("Empty", List.of()), Map.of());
+            }
+
+            List<String> headerRow = Arrays.stream(rows.get(0)).map(s -> s == null ? "" : s).toList();
+            HeaderDefinition chosen = chooseHeader(headerRow, headers);
+
+            Map<List<String>, Integer> counts = new HashMap<>();
             rows.stream()
                     .skip(1)
-                    .map(Arrays::asList)
+                    .map(arr -> Arrays.stream(arr).map(s -> s == null ? "" : s).toList())
+                    .filter(r -> !isBlankRow(r))
                     .map(List::copyOf)
-                    .filter(row -> row.stream().anyMatch(s -> !s.isBlank()))
-                    .forEach(row -> result.merge(row, 1, Integer::sum));
+                    .forEach(r -> counts.merge(r, 1, Integer::sum));
 
-            return result;
+            return new FileReadResult(chosen, counts);
         }
-    }
-
-    private Map<List<String>, Integer> mergeRows(Workbook workbook) {
-        Map<List<String>, Integer> result = new HashMap<>();
-        Sheet sheet = workbook.getSheetAt(0);
-        DataFormatter fmt = new DataFormatter();
-
-        for (Row row : sheet) {
-            short first = row.getFirstCellNum();
-            short last  = row.getLastCellNum();
-            if (first < 0 || last <= first) {
-                log.debug("Skipping empty row (mergeRows) row={} in sheet={}", row.getRowNum(), sheet.getSheetName());
-                continue;
-            }
-            if (row.getRowNum() == 0) continue;
-
-            List<String> cells = IntStream.range(first, last)
-                    .mapToObj(i -> {
-                        Cell c = row.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                        return c == null ? "" : fmt.formatCellValue(c);
-                    })
-                    .toList();
-            result.merge(List.copyOf(cells), 1, Integer::sum);
-        }
-        return result;
     }
 
     private FileType detect(File file) {
@@ -91,7 +99,48 @@ public class MergeService {
         throw new IllegalArgumentException("Unsupported file type: " + name);
     }
 
+    private List<String> normalizeRow(List<String> row) {
+        return row.stream()
+                .map(s -> s == null ? "" : s.trim().toLowerCase(Locale.ROOT))
+                .toList();
+    }
+
+    private boolean isBlankRow(List<String> row) {
+        return row == null || row.stream().allMatch(s -> s == null || s.isBlank());
+    }
+
+    private List<String> toStringRow(Row row, DataFormatter fmt) {
+        short first = row.getFirstCellNum();
+        short last  = row.getLastCellNum();
+        if (first < 0 || last <= first) return List.of();
+
+        return IntStream.range(first, last)
+                .mapToObj(i -> {
+                    Cell c = row.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                    return c == null ? "" : fmt.formatCellValue(c);
+                })
+                .toList();
+    }
+
+    private HeaderDefinition chooseHeader(List<String> firstRow, List<HeaderDefinition> headers) {
+        List<String> nFirst = normalizeRow(firstRow);
+
+        for (HeaderDefinition def : headers) {
+            if (normalizeRow(def.headers()).equals(nFirst)) return def;
+        }
+
+        int len = firstRow.size();
+        List<HeaderDefinition> sameLen = headers.stream()
+                .filter(h -> h.headers().size() == len)
+                .toList();
+
+        if (sameLen.size() == 1) return sameLen.get(0);
+        return new HeaderDefinition("Unknown_" + len, List.of());
+    }
+
     public enum FileType {
         EXCEL, CSV
     }
+
+    private record FileReadResult(HeaderDefinition header, Map<List<String>, Integer> counts) {}
 }
