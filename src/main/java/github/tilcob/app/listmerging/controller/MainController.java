@@ -3,6 +3,7 @@ package github.tilcob.app.listmerging.controller;
 import github.tilcob.app.listmerging.service.ExportService;
 import github.tilcob.app.listmerging.service.HeaderLoader;
 import github.tilcob.app.listmerging.service.MergeService;
+import github.tilcob.app.listmerging.service.MergeValidationService;
 import github.tilcob.app.listmerging.tasks.MergeExportTask;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -22,6 +23,7 @@ public class MainController {
     private HeaderLoader loader;
     private final MergeService mergeService = new MergeService();
     private final ExportService exportService = new ExportService();
+    private final MergeValidationService mergeValidationService = new MergeValidationService();
 
     @FXML
     private Label outputLabel;
@@ -48,7 +50,18 @@ public class MainController {
 
         File outDir = files.get(0).getParentFile();
         if (loader == null) loader = new HeaderLoader();
-        MergeExportTask task = new MergeExportTask(files, outDir, loader, mergeService, exportService);
+        MergeExportTask task = new MergeExportTask(
+                files,
+                outDir,
+                loader,
+                mergeService,
+                exportService,
+                mergeValidationService,
+                null,
+                isValidationWarningModeEnabled(),
+                shouldWriteValidationReport(),
+                new com.fasterxml.jackson.databind.ObjectMapper()
+        );
 
         outputLabel.textProperty().bind(task.messageProperty());
 
@@ -68,7 +81,10 @@ public class MainController {
             progressBar.setVisible(false);
 
             File exported = task.getValue();
-            outputLabel.setText("Export created: " + exported.getAbsolutePath());
+            String reportInfo = task.getValidationReportFile() == null
+                    ? ""
+                    : " | Report: " + task.getValidationReportFile().getAbsolutePath();
+            outputLabel.setText("Export created: " + exported.getAbsolutePath() + " | " + task.getValidationSummary() + reportInfo);
         });
 
         task.setOnFailed(e -> {
@@ -78,7 +94,9 @@ public class MainController {
             progressBar.setVisible(false);
 
             Throwable ex = task.getException();
-            outputLabel.setText("Error during merge/export. See logs.");
+            outputLabel.setText(ex == null
+                    ? "Error during merge/export."
+                    : ex.getMessage());
             log.error("Merge/export failed", ex);
         });
 
@@ -99,5 +117,13 @@ public class MainController {
 
     private Window getCurrentWindow() {
         return outputLabel.getScene().getWindow();
+    }
+
+    private boolean isValidationWarningModeEnabled() {
+        return Boolean.parseBoolean(System.getProperty("listmerging.validation.warn-mode", "false"));
+    }
+
+    private boolean shouldWriteValidationReport() {
+        return Boolean.parseBoolean(System.getProperty("listmerging.validation.write-report", "true"));
     }
 }
