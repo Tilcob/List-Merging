@@ -20,7 +20,8 @@ import java.util.Optional;
 public record ValidationContext(Map<String, ExpectedMetrics> expectedMetricsByHeader,
                                 BigDecimal sumTolerance,
                                 int sumScale,
-                                boolean treatMissingExpectationsAsWarning) {
+                                boolean treatMissingExpectationsAsWarning,
+                                boolean enableReferenceAggregation) {
 
     public ValidationContext {
         expectedMetricsByHeader = expectedMetricsByHeader == null ? Map.of() : Map.copyOf(expectedMetricsByHeader);
@@ -31,7 +32,7 @@ public record ValidationContext(Map<String, ExpectedMetrics> expectedMetricsByHe
     }
 
     public static ValidationContext defaults() {
-        return new ValidationContext(Map.of(), null, 2, true);
+        return new ValidationContext(Map.of(), null, 2, true, false);
     }
 
     public Optional<ExpectedMetrics> metricsFor(String headerName) {
