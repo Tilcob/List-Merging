@@ -1,5 +1,6 @@
 package github.tilcob.app.listmerging.tasks;
 
+import github.tilcob.app.listmerging.model.AggregationResult;
 import github.tilcob.app.listmerging.model.HeaderDefinition;
 import github.tilcob.app.listmerging.service.ExportService;
 import github.tilcob.app.listmerging.service.HeaderLoader;
@@ -37,7 +38,7 @@ public class MergeExportTask extends Task<File> {
 
         updateProgress(1, 3);
         updateMessage("Merging files...");
-        Map<HeaderDefinition, Map<List<String>, Integer>> merged =
+        Map<HeaderDefinition, Map<List<String>, AggregationResult>> merged =
                 mergeService.merge(files, headers);
 
         updateProgress(2, 3);

@@ -1,5 +1,11 @@
 {
   "name": "SolidWorks Montage",
-  "headers": ["POS-NR.", "BENENNUNG", "Gewicht [g]", "Anzahl"],
-  "headerPosition": "LAST"
+  "headers": [
+    "POS-NR.",
+    "BENENNUNG",
+    "Gewicht [g]",
+    "Anzahl"
+  ],
+  "headerPosition": "LAST",
+  "sumColumn": "Anzahl"
 }

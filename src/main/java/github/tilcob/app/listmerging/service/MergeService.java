@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvException;
+import github.tilcob.app.listmerging.model.AggregationResult;
 import github.tilcob.app.listmerging.model.HeaderDefinition;
 import org.apache.poi.ss.usermodel.*;
 import org.slf4j.Logger;
@@ -11,17 +12,21 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 public class MergeService {
     private static final Logger log = LoggerFactory.getLogger(MergeService.class);
+    private static final Pattern DEFAULT_SUM_PATTERN = Pattern.compile("(\\d+[\\.,]?\\d*)");
 
-    public Map<HeaderDefinition, Map<List<String>, Integer>> merge(List<File> files, List<HeaderDefinition> headers)
+    public Map<HeaderDefinition, Map<List<String>, AggregationResult>> merge(List<File> files, List<HeaderDefinition> headers)
             throws IOException, CsvException {
-        Map<HeaderDefinition, Map<List<String>, Integer>> result = new LinkedHashMap<>();
+        Map<HeaderDefinition, Map<List<String>, AggregationResult>> result = new LinkedHashMap<>();
 
         for (File file : files) {
             FileType fileType = detect(file);
@@ -29,10 +34,11 @@ public class MergeService {
                 case EXCEL -> readExcel(file, headers);
                 case CSV -> readCsv(file, headers);
             };
-            Map<List<String>, Integer> bucket =
+            Map<List<String>, AggregationResult> bucket =
                     result.computeIfAbsent(fileResult.header(), k -> new HashMap<>());
 
-            fileResult.counts().forEach((row, count) -> bucket.merge(row, count, Integer::sum));
+            fileResult.counts().forEach((row, aggregation) ->
+                    bucket.merge(row, aggregation, AggregationResult::add));
         }
         return result;
     }
@@ -60,7 +66,8 @@ public class MergeService {
                     ? lastRowIndex
                     : firstRowIndex;
 
-            Map<List<String>, Integer> counts = new HashMap<>();
+            SumConfig sumConfig = buildSumConfig(chosen);
+            Map<List<String>, AggregationResult> counts = new HashMap<>();
             for (int r = firstRowIndex; r <= lastRowIndex; r++) {
                 if (r == headerIndex) continue;
                 Row row = sheet.getRow(r);
@@ -69,7 +76,9 @@ public class MergeService {
                 List<String> cells = toStringRow(row, fmt);
                 if (isBlankRow(cells)) continue;
 
-                counts.merge(List.copyOf(cells), 1, Integer::sum);
+                List<String> key = buildGroupingKey(cells, sumConfig.columnIndex());
+                BigDecimal sumValue = parseSumValue(cells, sumConfig);
+                counts.merge(key, new AggregationResult(1, sumValue), AggregationResult::add);
             }
 
             return new FileReadResult(chosen, counts);
@@ -104,17 +113,83 @@ public class MergeService {
                     ? lastRowIndex
                     : firstRowIndex;
 
-            Map<List<String>, Integer> counts = new HashMap<>();
+            SumConfig sumConfig = buildSumConfig(chosen);
+            Map<List<String>, AggregationResult> counts = new HashMap<>();
             for (int i = firstRowIndex; i <= lastRowIndex; i++) {
                 if (i == headerIndex) continue;
 
                 List<String> row = rows.get(i);
                 if (isBlankRow(row)) continue;
 
-                counts.merge(List.copyOf(row), 1, Integer::sum);
+                List<String> key = buildGroupingKey(row, sumConfig.columnIndex());
+                BigDecimal sumValue = parseSumValue(row, sumConfig);
+                counts.merge(key, new AggregationResult(1, sumValue), AggregationResult::add);
             }
 
             return new FileReadResult(chosen, counts);
+        }
+    }
+
+    private SumConfig buildSumConfig(HeaderDefinition header) {
+        String sumColumn = header.sumColumn();
+        if (sumColumn == null || sumColumn.isBlank() || header.headers() == null || header.headers().isEmpty()) {
+            return new SumConfig(-1, DEFAULT_SUM_PATTERN);
+        }
+
+        int columnIndex = IntStream.range(0, header.headers().size())
+                .filter(i -> sumColumn.equalsIgnoreCase(header.headers().get(i)))
+                .findFirst()
+                .orElse(-1);
+
+        if (columnIndex < 0) {
+            log.warn("Configured sumColumn '{}' not found in header set '{}'.", sumColumn, header.name());
+            return new SumConfig(-1, DEFAULT_SUM_PATTERN);
+        }
+
+        Pattern pattern = DEFAULT_SUM_PATTERN;
+        if (header.sumPattern() != null && !header.sumPattern().isBlank()) {
+            pattern = Pattern.compile(header.sumPattern());
+        }
+
+        return new SumConfig(columnIndex, pattern);
+    }
+
+    private List<String> buildGroupingKey(List<String> row, int sumColumnIndex) {
+        if (sumColumnIndex < 0 || sumColumnIndex >= row.size()) {
+            return List.copyOf(row);
+        }
+
+        List<String> key = new ArrayList<>(row.size() - 1);
+        for (int i = 0; i < row.size(); i++) {
+            if (i != sumColumnIndex) {
+                key.add(row.get(i));
+            }
+        }
+        return List.copyOf(key);
+    }
+
+    private BigDecimal parseSumValue(List<String> row, SumConfig sumConfig) {
+        int idx = sumConfig.columnIndex();
+        if (idx < 0 || idx >= row.size()) {
+            return BigDecimal.ZERO;
+        }
+
+        String cellValue = row.get(idx);
+        if (cellValue == null || cellValue.isBlank()) {
+            return BigDecimal.ZERO;
+        }
+
+        Matcher matcher = sumConfig.pattern().matcher(cellValue);
+        if (!matcher.find()) {
+            return BigDecimal.ZERO;
+        }
+
+        String normalized = matcher.group(1).replace(',', '.');
+        try {
+            return new BigDecimal(normalized);
+        } catch (NumberFormatException ex) {
+            log.debug("Could not parse sum value '{}' in cell '{}'.", normalized, cellValue);
+            return BigDecimal.ZERO;
         }
     }
 
@@ -208,6 +283,9 @@ public class MergeService {
         EXCEL, CSV
     }
 
-    private record FileReadResult(HeaderDefinition header, Map<List<String>, Integer> counts) {
+    private record FileReadResult(HeaderDefinition header, Map<List<String>, AggregationResult> counts) {
+    }
+
+    private record SumConfig(int columnIndex, Pattern pattern) {
     }
 }
