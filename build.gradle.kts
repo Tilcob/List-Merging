@@ -1,6 +1,8 @@
 import groovy.json.JsonOutput
 import io.github.fourlastor.construo.Target
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 plugins {
     java
@@ -28,7 +30,7 @@ java {
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-    modularity.inferModulePath.set(true)
+    modularity.inferModulePath.set(false)
 }
 
 application {
@@ -68,14 +70,25 @@ construo {
     jarTask.set("shadowJar")
 
     jlink {
-        guessModulesFromJar.set(true)
+        guessModulesFromJar.set(false)
+        modules.set(listOf(
+            "java.desktop",
+            "java.logging",
+            "java.xml",
+            "java.naming",
+            "java.sql",
+            "java.management",
+            "java.scripting",
+            "jdk.unsupported"
+        ))
     }
 
     targets {
         create<Target.Windows>("winX64") {
             architecture.set(Target.Architecture.X86_64)
-            //icon.set(project.file("icons/logo.png"))
+            icon.set(project.file("src/main/resources/icons/logo.png"))
             jdkUrl.set("https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.15%2B6/OpenJDK17U-jdk_x64_windows_hotspot_17.0.15_6.zip")
+            //useConsole.set(true)
         }
 
         create<Target.Linux>("linuxX64") {
@@ -96,6 +109,10 @@ construo {
             macIcon.set(project.file("icons/logo.icns"))
             jdkUrl.set("https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.15%2B6/OpenJDK17U-jdk_x64_mac_hotspot_17.0.15_6.tar.gz")
         }
+    }
+
+    roast {
+        runOnFirstThread.set(false)
     }
 }
 
@@ -139,4 +156,41 @@ tasks.named<ShadowJar>("shadowJar") {
     archiveBaseName.set("List-Merging")
     archiveClassifier.set("")
     mergeServiceFiles()
+}
+
+val fixRuntimeImageWinX64 by tasks.registering {
+    dependsOn("createRuntimeImageWinX64")
+
+    doLast {
+        val runtimeImageDir = layout.buildDirectory
+            .dir("construo/runtime-image/${appName}-winX64")
+            .get().asFile
+
+        val runtimeBin = runtimeImageDir.resolve("bin")
+        require(runtimeBin.exists()) { "runtime bin not found: $runtimeBin" }
+
+        val jdkRoot = layout.buildDirectory
+            .dir("construo/jdk/winX64")
+            .get().asFile
+
+        val jdkHome = jdkRoot.listFiles()
+            ?.firstOrNull { it.isDirectory && it.name.startsWith("jdk") }
+            ?: error("No JDK home found in: $jdkRoot")
+
+        val jdkBin = jdkHome.resolve("bin")
+        val javaExe  = jdkBin.resolve("java.exe")
+        val javawExe = jdkBin.resolve("javaw.exe")
+
+        require(javaExe.exists())  { "Missing: $javaExe" }
+        require(javawExe.exists()) { "Missing: $javawExe" }
+
+        Files.copy(javaExe.toPath(),  runtimeBin.resolve("java.exe").toPath(),  StandardCopyOption.REPLACE_EXISTING)
+        Files.copy(javawExe.toPath(), runtimeBin.resolve("javaw.exe").toPath(), StandardCopyOption.REPLACE_EXISTING)
+
+        println("Copied java.exe and javaw.exe into: $runtimeBin")
+    }
+}
+
+tasks.named("packageWinX64") {
+    dependsOn(fixRuntimeImageWinX64)
 }
