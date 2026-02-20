@@ -9,6 +9,7 @@ module github.tilcob.app.listmerging {
     requires com.opencsv;
     requires org.slf4j;
     requires commons.math3;
+    requires org.junit.jupiter.api;
 
     opens github.tilcob.app.listmerging.model to com.fasterxml.jackson.databind;
     opens github.tilcob.app.listmerging to javafx.fxml;
