@@ -96,7 +96,7 @@ public class HeaderLoader {
         if (definition.headers() == null || definition.headers().isEmpty()) {
             throw new IllegalArgumentException("Missing headers in " + source);
         }
-        return new HeaderDefinition(definition.name(), List.copyOf(definition.headers()));
+        return new HeaderDefinition(definition.name(), List.copyOf(definition.headers()), definition.headerPosition());
     }
 
     public List<HeaderDefinition> getHeaders() {

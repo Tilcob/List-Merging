@@ -83,9 +83,11 @@ The application loads headers from **two sources**:
 ```json
 {
   "name": "My Header Set",
-  "headers": ["Column A", "Column B", "Column C"]
+  "headers": ["Column A", "Column B", "Column C"],
+  "headerPosition": "FIRST"
 }
 ```
+`headerPosition` ist optional und erlaubt `FIRST` oder `LAST` (Standard: `FIRST`).
 
 ### Option A: Add headers to the project (requires rebuild)
 

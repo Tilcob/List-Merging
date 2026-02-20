@@ -42,16 +42,27 @@ public class MergeService {
             Sheet sheet = workbook.getSheetAt(0);
             DataFormatter fmt = new DataFormatter();
 
-            Row headerRowPoi = sheet.getRow(0);
-            if (headerRowPoi == null) {
+            int firstRowIndex = 0;
+            int lastRowIndex = findLastNonBlankExcelRow(sheet, fmt);
+            if (lastRowIndex < 0) {
                 return new FileReadResult(new HeaderDefinition("Empty", List.of()), Map.of());
             }
 
-            List<String> headerRow = toStringRow(headerRowPoi, fmt);
-            HeaderDefinition chosen = chooseHeader(headerRow, headers);
+            List<String> firstRow = Optional.ofNullable(sheet.getRow(firstRowIndex))
+                    .map(row -> toStringRow(row, fmt))
+                    .orElse(List.of());
+            List<String> lastRow = Optional.ofNullable(sheet.getRow(lastRowIndex))
+                    .map(row -> toStringRow(row, fmt))
+                    .orElse(List.of());
+
+            HeaderDefinition chosen = chooseHeader(firstRow, lastRow, headers);
+            int headerIndex = chosen.headerPosition() == HeaderDefinition.HeaderPosition.LAST
+                    ? lastRowIndex
+                    : firstRowIndex;
 
             Map<List<String>, Integer> counts = new HashMap<>();
-            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+            for (int r = firstRowIndex; r <= lastRowIndex; r++) {
+                if (r == headerIndex) continue;
                 Row row = sheet.getRow(r);
                 if (row == null) continue;
 
@@ -73,21 +84,35 @@ public class MergeService {
                 .withCSVParser(new CSVParserBuilder().withSeparator(';').build())
                 .build()
         ) {
-            List<String[]> rows = reader.readAll();
+            List<List<String>> rows = reader.readAll().stream()
+                    .map(arr -> Arrays.stream(arr).map(s -> s == null ? "" : s).toList())
+                    .toList();
             if (rows.isEmpty()) {
                 return new FileReadResult(new HeaderDefinition("Empty", List.of()), Map.of());
             }
 
-            List<String> headerRow = Arrays.stream(rows.get(0)).map(s -> s == null ? "" : s).toList();
-            HeaderDefinition chosen = chooseHeader(headerRow, headers);
+            int firstRowIndex = 0;
+            int lastRowIndex = findLastNonBlankCsvRow(rows);
+            if (lastRowIndex < 0) {
+                return new FileReadResult(new HeaderDefinition("Empty", List.of()), Map.of());
+            }
+
+            List<String> firstRow = rows.get(firstRowIndex);
+            List<String> lastRow = rows.get(lastRowIndex);
+            HeaderDefinition chosen = chooseHeader(firstRow, lastRow, headers);
+            int headerIndex = chosen.headerPosition() == HeaderDefinition.HeaderPosition.LAST
+                    ? lastRowIndex
+                    : firstRowIndex;
 
             Map<List<String>, Integer> counts = new HashMap<>();
-            rows.stream()
-                    .skip(1)
-                    .map(arr -> Arrays.stream(arr).map(s -> s == null ? "" : s).toList())
-                    .filter(r -> !isBlankRow(r))
-                    .map(List::copyOf)
-                    .forEach(r -> counts.merge(r, 1, Integer::sum));
+            for (int i = firstRowIndex; i <= lastRowIndex; i++) {
+                if (i == headerIndex) continue;
+
+                List<String> row = rows.get(i);
+                if (isBlankRow(row)) continue;
+
+                counts.merge(List.copyOf(row), 1, Integer::sum);
+            }
 
             return new FileReadResult(chosen, counts);
         }
@@ -112,7 +137,7 @@ public class MergeService {
 
     private List<String> toStringRow(Row row, DataFormatter fmt) {
         short first = row.getFirstCellNum();
-        short last  = row.getLastCellNum();
+        short last = row.getLastCellNum();
         if (first < 0 || last <= first) return List.of();
 
         return IntStream.range(first, last)
@@ -123,16 +148,42 @@ public class MergeService {
                 .toList();
     }
 
-    private HeaderDefinition chooseHeader(List<String> firstRow, List<HeaderDefinition> headers) {
-        List<String> nFirst = normalizeRow(firstRow);
+    private int findLastNonBlankExcelRow(Sheet sheet, DataFormatter fmt) {
+        for (int i = sheet.getLastRowNum(); i >= 0; i--) {
+            Row row = sheet.getRow(i);
+            if (row != null && !isBlankRow(toStringRow(row, fmt))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int findLastNonBlankCsvRow(List<List<String>> rows) {
+        for (int i = rows.size() - 1; i >= 0; i--) {
+            if (!isBlankRow(rows.get(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private HeaderDefinition chooseHeader(List<String> firstRow, List<String> lastRow, List<HeaderDefinition> headers) {
+        List<String> normalizedFirst = normalizeRow(firstRow);
+        List<String> normalizedLast = normalizeRow(lastRow);
 
         for (HeaderDefinition def : headers) {
-            if (normalizeRow(def.headers()).equals(nFirst)) return def;
+            List<String> normalizedDef = normalizeRow(def.headers());
+            if (def.headerPosition() == HeaderDefinition.HeaderPosition.LAST) {
+                if (normalizedDef.equals(normalizedLast)) return def;
+                continue;
+            }
+            if (normalizedDef.equals(normalizedFirst)) return def;
         }
 
         int len = firstRow.size();
         List<HeaderDefinition> sameLen = headers.stream()
                 .filter(h -> h.headers().size() == len)
+                .filter(h -> h.headerPosition() == HeaderDefinition.HeaderPosition.FIRST)
                 .toList();
 
         if (sameLen.size() == 1) return sameLen.get(0);
@@ -143,5 +194,6 @@ public class MergeService {
         EXCEL, CSV
     }
 
-    private record FileReadResult(HeaderDefinition header, Map<List<String>, Integer> counts) {}
+    private record FileReadResult(HeaderDefinition header, Map<List<String>, Integer> counts) {
+    }
 }
