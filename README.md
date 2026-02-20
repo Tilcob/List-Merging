@@ -14,8 +14,8 @@ The app loads headers from **two sources**:
 
 ```json
 {
-  ‘name’: ‘My header’,
-  ‘headers’: [‘Column A’, ‘Column B’]
+  "name": "My header",
+  "headers": ["Column A", "Column B"]
 }
 ```
 
