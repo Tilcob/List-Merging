@@ -4,7 +4,6 @@ import github.tilcob.app.listmerging.service.ExportService;
 import github.tilcob.app.listmerging.service.HeaderLoader;
 import github.tilcob.app.listmerging.service.MergeService;
 import github.tilcob.app.listmerging.tasks.MergeExportTask;
-import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -31,13 +30,16 @@ public class MainController {
     @FXML
     private ProgressBar progressBar;
 
+    @FXML
+    private void initialize() {
+        progressBar.setProgress(0);
+        progressBar.setVisible(false);
+    }
 
     @FXML
     protected void onButtonMergeClick() {
         FileChooser chooser = createFileChooser("Select files to merge");
         List<File> files = chooser.showOpenMultipleDialog(getCurrentWindow());
-
-        if (loader == null) loader = new HeaderLoader();
 
         if (files == null || files.isEmpty()) {
             outputLabel.setText("No files selected");
@@ -45,19 +47,25 @@ public class MainController {
         }
 
         File outDir = files.get(0).getParentFile();
+        if (loader == null) loader = new HeaderLoader();
         MergeExportTask task = new MergeExportTask(files, outDir, loader, mergeService, exportService);
 
-        progressBar.progressProperty().bind(task.progressProperty());
         outputLabel.textProperty().bind(task.messageProperty());
 
         if (mergeButton != null) {
             mergeButton.disableProperty().bind(task.runningProperty());
         }
 
+        task.setOnRunning(e -> {
+            progressBar.setVisible(true);
+            progressBar.progressProperty().bind(task.progressProperty());
+        });
+
         task.setOnSucceeded(e -> {
             outputLabel.textProperty().unbind();
             progressBar.progressProperty().unbind();
             progressBar.setProgress(0);
+            progressBar.setVisible(false);
 
             File exported = task.getValue();
             outputLabel.setText("Export created: " + exported.getAbsolutePath());
@@ -67,6 +75,7 @@ public class MainController {
             outputLabel.textProperty().unbind();
             progressBar.progressProperty().unbind();
             progressBar.setProgress(0);
+            progressBar.setVisible(false);
 
             Throwable ex = task.getException();
             outputLabel.setText("Error during merge/export. See logs.");
