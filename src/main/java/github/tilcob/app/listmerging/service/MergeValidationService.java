@@ -20,7 +20,7 @@ public class MergeValidationService {
     public ValidationReport validate(Map<HeaderDefinition, Map<List<String>, AggregationResult>> merged,
                                      ValidationContext context) {
         ValidationContext effectiveContext = context == null
-                ? new ValidationContext(null, null, null, 2)
+                ? ValidationContext.defaults()
                 : context;
         List<ValidationIssue> issues = new ArrayList<>();
 
@@ -103,7 +103,7 @@ public class MergeValidationService {
                 }
             }
 
-            validateRowCount(headerName, actualRowCount, effectiveContext, issues);
+            validateRowCount(header, headerName, actualRowCount, effectiveContext, issues);
             validateSum(header, headerName, actualSum, effectiveContext, issues);
         }
 
@@ -112,31 +112,39 @@ public class MergeValidationService {
         return valid ? ValidationReport.valid() : ValidationReport.invalid(issues);
     }
 
-    private void validateRowCount(String headerName,
+    private void validateRowCount(HeaderDefinition header,
+                                  String headerName,
                                   int actualRowCount,
                                   ValidationContext context,
                                   List<ValidationIssue> issues) {
-        int expectedRowCount = context.expectedRowsFor(headerName);
-        if (expectedRowCount < 0) {
-            log.debug("No expected row count configured for header '{}'. Skipping count check.", headerName);
+        String metricsHeaderName = resolveHeaderName(header, headerName);
+        Integer expectedRowCount = context.expectedRowsFor(metricsHeaderName).orElse(null);
+        if (expectedRowCount == null) {
+            handleMissingExpectation(
+                    context,
+                    issues,
+                    "MISSING_EXPECTED_ROW_COUNT",
+                    "Kein Sollwert für die erwartete Zeilenanzahl vorhanden.",
+                    metricsHeaderName
+            );
             return;
         }
 
         if (actualRowCount != expectedRowCount) {
             log.warn("Row count mismatch for header '{}': expected={}, actual={}",
-                    headerName,
+                    metricsHeaderName,
                     expectedRowCount,
                     actualRowCount);
             issues.add(new ValidationIssue(
                     ValidationIssue.COUNT_MISMATCH,
                     "Datenzeilen-Anzahl entspricht nicht dem erwarteten Wert.",
-                    headerName,
+                    metricsHeaderName,
                     "expected=" + expectedRowCount + ", actual=" + actualRowCount
             ));
             return;
         }
 
-        log.debug("Row count check passed for header '{}': {}", headerName, actualRowCount);
+        log.debug("Row count check passed for header '{}': {}", metricsHeaderName, actualRowCount);
     }
 
     private void validateSum(HeaderDefinition header,
@@ -144,14 +152,21 @@ public class MergeValidationService {
                              BigDecimal actualSum,
                              ValidationContext context,
                              List<ValidationIssue> issues) {
+        String metricsHeaderName = resolveHeaderName(header, headerName);
         if (header.sumColumn() == null || header.sumColumn().isBlank()) {
             log.debug("Header '{}' has no sumColumn configured. Skipping sum check.", headerName);
             return;
         }
 
-        BigDecimal expectedSum = context.expectedSumFor(headerName);
+        BigDecimal expectedSum = context.expectedSumFor(metricsHeaderName).orElse(null);
         if (expectedSum == null) {
-            log.debug("No expected sum configured for header '{}'. Skipping sum check.", headerName);
+            handleMissingExpectation(
+                    context,
+                    issues,
+                    "MISSING_EXPECTED_SUM",
+                    "Kein Sollwert für die erwartete Summe vorhanden.",
+                    metricsHeaderName
+            );
             return;
         }
 
@@ -161,7 +176,7 @@ public class MergeValidationService {
 
         if (delta.compareTo(context.sumTolerance()) > 0) {
             log.warn("Sum mismatch for header '{}': expected={}, actual={}, tolerance={}, delta={}",
-                    headerName,
+                    metricsHeaderName,
                     scaledExpected,
                     scaledActual,
                     context.sumTolerance(),
@@ -169,7 +184,7 @@ public class MergeValidationService {
             issues.add(new ValidationIssue(
                     ValidationIssue.SUM_MISMATCH,
                     "Summenprüfung fehlgeschlagen.",
-                    headerName,
+                    metricsHeaderName,
                     "expected=" + scaledExpected
                             + ", actual=" + scaledActual
                             + ", tolerance=" + context.sumTolerance()
@@ -179,9 +194,32 @@ public class MergeValidationService {
         }
 
         log.debug("Sum check passed for header '{}': expected={}, actual={}, tolerance={}",
-                headerName,
+                metricsHeaderName,
                 scaledExpected,
                 scaledActual,
                 context.sumTolerance());
+    }
+
+    private void handleMissingExpectation(ValidationContext context,
+                                          List<ValidationIssue> issues,
+                                          String code,
+                                          String message,
+                                          String headerName) {
+        if (context.treatMissingExpectationsAsWarning()) {
+            log.warn("{} Header='{}'. Validation continues because missing expectations are configured as warnings.",
+                    message,
+                    headerName);
+            return;
+        }
+
+        log.warn("{} Header='{}'. Validation marked as invalid.", message, headerName);
+        issues.add(new ValidationIssue(code, message, headerName));
+    }
+
+    private String resolveHeaderName(HeaderDefinition header, String fallbackHeaderName) {
+        if (header != null && header.name() != null && !header.name().isBlank()) {
+            return header.name();
+        }
+        return fallbackHeaderName;
     }
 }
