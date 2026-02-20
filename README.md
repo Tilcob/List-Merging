@@ -1,32 +1,118 @@
-# List Merging
+# List-Merging
 
-## Add header definitions (`*.json`)
+List-Merging is a JavaFX desktop application for merging multiple input files (Excel/CSV) and exporting a combined result.
 
-The app loads headers from **two sources**:
+## Features
 
-1. **Bundled default headers** from `src/main/resources/headers` (included in the build)
-2. **External headers** from the `./headers` folder next to the app's start directory
+- Merge multiple input files into one output.
+- Supports:
+    - Excel (`.xls`, `.xlsx`)
+    - CSV (`.csv`)
+- Background merge/export task with progress indication in the UI.
+- Configurable header definitions via JSON.
+- Built-in default headers + optional runtime header overrides.
 
-### Option A: Manually in the project (for the next build)
+## Tech Stack
 
-1. Create a new file in `src/main/resources/headers/<Name>.json`.
-2. Format:
+- Java 17 (toolchain)
+- JavaFX 17
+- Gradle
+- Jackson (JSON)
+- Apache POI (Excel)
+- OpenCSV
+- SLF4J + Logback
+- Construo (native app packaging)
+
+## Project Structure
+
+- `src/main/java/github/tilcob/app/listmerging`
+    - `controller/` – JavaFX controller logic
+    - `service/` – merge, export, header loading
+    - `tasks/` – background task orchestration
+    - `model/` – data model classes
+- `src/main/resources`
+    - `headers/` – bundled header definitions (`*.json` + `index.json`)
+    - `github/tilcob/app/listmerging/mainView.fxml` – main UI
+    - `icons/` – app icon assets
+
+## Build and Run
+
+### Run locally
+
+```bash
+./gradlew run
+```
+
+### Run tests
+
+```bash
+./gradlew test
+```
+
+### Build JAR
+
+```bash
+./gradlew shadowJar
+```
+
+### Build packaged app (example Windows target)
+
+```bash
+./gradlew packageWinX64
+```
+
+> Packaging uses Construo and target-specific runtime image steps.
+
+## Using the App
+
+1. Start the application.
+2. Click **Merge**.
+3. Select multiple Excel/CSV files.
+4. Wait for the background process to complete.
+5. The app shows the generated export path.
+
+## Header Definitions (`*.json`)
+
+The application loads headers from **two sources**:
+
+1. **Bundled default headers** from `src/main/resources/headers` (included at build time)
+2. **External runtime headers** from `./headers` next to the app working directory
+
+### JSON format
 
 ```json
 {
-  "name": "My header",
-  "headers": ["Column A", "Column B"]
+  "name": "My Header Set",
+  "headers": ["Column A", "Column B", "Column C"]
 }
 ```
 
-3. Run the build (`./gradlew build` or package task).
+### Option A: Add headers to the project (requires rebuild)
 
-`index.json` is automatically regenerated during the build.
+1. Add a new file to `src/main/resources/headers/<name>.json`.
+2. Build the app again.
 
-### Option B: Without rebuild as an ‘extra feature’
+`index.json` is generated automatically during the build.
 
-1. Create a `headers` folder in the application's start folder.
-2. Save `*.json` files with the same format there.
+### Option B: Add headers at runtime (no rebuild)
+
+1. Create a `headers` folder in the app start/working directory.
+2. Add your `*.json` files there.
 3. Restart the app.
 
-The external files are loaded at startup. If the same `name` already exists in the bundled headers, the external file overwrites the default entry.
+Behavior:
+
+- Both bundled and external headers are loaded.
+- If an external header has the same `name` as a bundled one, the external header overrides it.
+- `index.json` is ignored for external runtime header loading.
+
+## Development Notes
+
+- Main module descriptor: `src/main/java/module-info.java`
+- Application entry points:
+    - `github.tilcob.app.listmerging.Launcher`
+    - `github.tilcob.app.listmerging.Application`
+
+## License
+
+No explicit license file is currently included in this repository.
