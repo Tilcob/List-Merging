@@ -96,7 +96,23 @@ public class HeaderLoader {
         if (definition.headers() == null || definition.headers().isEmpty()) {
             throw new IllegalArgumentException("Missing headers in " + source);
         }
-        return new HeaderDefinition(definition.name(), List.copyOf(definition.headers()), definition.headerPosition());
+        List<List<String>> aliases = null;
+        if (definition.headerAliases() != null) {
+            aliases = definition.headerAliases().stream()
+                    .map(alias -> {
+                        if (alias == null || alias.isEmpty()) {
+                            throw new IllegalArgumentException("Header alias entries must not be empty in " + source);
+                        }
+                        return List.copyOf(alias);
+                    })
+                    .toList();
+        }
+
+        return new HeaderDefinition(
+                definition.name(),
+                List.copyOf(definition.headers()),
+                aliases,
+                definition.headerPosition());
     }
 
     public List<HeaderDefinition> getHeaders() {

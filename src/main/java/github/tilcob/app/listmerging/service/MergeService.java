@@ -180,6 +180,20 @@ public class MergeService {
             if (normalizedDef.equals(normalizedFirst)) return def;
         }
 
+        for (HeaderDefinition def : headers) {
+            if (def.headerAliases() == null || def.headerAliases().isEmpty()) continue;
+
+            List<List<String>> normalizedAliases = def.headerAliases().stream()
+                    .map(this::normalizeRow)
+                    .toList();
+
+            if (def.headerPosition() == HeaderDefinition.HeaderPosition.LAST) {
+                if (normalizedAliases.contains(normalizedLast)) return def;
+                continue;
+            }
+            if (normalizedAliases.contains(normalizedFirst)) return def;
+        }
+
         int len = firstRow.size();
         List<HeaderDefinition> sameLen = headers.stream()
                 .filter(h -> h.headers().size() == len)

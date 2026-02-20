@@ -1,5 +1,18 @@
 {
   "name": "Piping",
-  "headers": ["Benennung", "Material", "DN", "Stk."],
-  "headerPosition": "FIRST"
+  "headers": [
+    "Benennung",
+    "Material",
+    "DN",
+    "Stk."
+  ],
+  "headerPosition": "FIRST",
+  "headerAliases": [
+    [
+      "Benennunng",
+      "Material",
+      "DN",
+      "Stk."
+    ]
+  ]
 }
