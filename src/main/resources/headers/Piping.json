@@ -1,4 +1,5 @@
 {
   "name": "Piping",
-  "headers": ["Benennung", "Material", "DN", "Stk."]
+  "headers": ["Benennung", "Material", "DN", "Stk."],
+  "headerPosition": "FIRST"
 }
