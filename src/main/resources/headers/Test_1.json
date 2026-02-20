@@ -1,7 +1,10 @@
-[
-  "ID",
-  "First Name",
-  "Last Name",
-  "Street",
-  "City"
-]
+{
+  "name": "Test",
+  "headers": [
+    "ID",
+    "First Name",
+    "Last Name",
+    "Street",
+    "City"
+  ]
+}

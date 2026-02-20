@@ -1,48 +1,90 @@
 package github.tilcob.app.listmerging.controller;
 
-import com.opencsv.exceptions.CsvValidationException;
+import github.tilcob.app.listmerging.service.ExportService;
 import github.tilcob.app.listmerging.service.HeaderLoader;
 import github.tilcob.app.listmerging.service.MergeService;
+import github.tilcob.app.listmerging.tasks.MergeExportTask;
 import javafx.fxml.FXML;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
-import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 
 public class MainController {
     private static final Logger log = LoggerFactory.getLogger(MainController.class);
 
+    private HeaderLoader loader;
+    private final MergeService mergeService = new MergeService();
+    private final ExportService exportService = new ExportService();
+
     @FXML
     private Label outputLabel;
+    @FXML
+    private Button mergeButton;
+    @FXML
+    private ProgressBar progressBar;
+
+    @FXML
+    private void initialize() {
+        progressBar.setProgress(0);
+        progressBar.setVisible(false);
+    }
 
     @FXML
     protected void onButtonMergeClick() {
-        FileChooser fileChooser = createFileChooser("Select files to merge");
-        MergeService mergeService = new MergeService();
-        Map<List<String>, Integer> merged;
+        FileChooser chooser = createFileChooser("Select files to merge");
+        List<File> files = chooser.showOpenMultipleDialog(getCurrentWindow());
 
-        List<File> files = fileChooser.showOpenMultipleDialog(getCurrentWindow());
-
-        if (Objects.isNull(files) || files.isEmpty()) {
+        if (files == null || files.isEmpty()) {
             outputLabel.setText("No files selected");
             return;
         }
-        try {
-            merged = Map.copyOf(mergeService.merge(files));
-        } catch (Exception e) {
-            outputLabel.setText("Error loading headers");
-            log.error("Error loading headers: ", e);
+
+        File outDir = files.get(0).getParentFile();
+        if (loader == null) loader = new HeaderLoader();
+        MergeExportTask task = new MergeExportTask(files, outDir, loader, mergeService, exportService);
+
+        outputLabel.textProperty().bind(task.messageProperty());
+
+        if (mergeButton != null) {
+            mergeButton.disableProperty().bind(task.runningProperty());
         }
+
+        task.setOnRunning(e -> {
+            progressBar.setVisible(true);
+            progressBar.progressProperty().bind(task.progressProperty());
+        });
+
+        task.setOnSucceeded(e -> {
+            outputLabel.textProperty().unbind();
+            progressBar.progressProperty().unbind();
+            progressBar.setProgress(0);
+            progressBar.setVisible(false);
+
+            File exported = task.getValue();
+            outputLabel.setText("Export created: " + exported.getAbsolutePath());
+        });
+
+        task.setOnFailed(e -> {
+            outputLabel.textProperty().unbind();
+            progressBar.progressProperty().unbind();
+            progressBar.setProgress(0);
+            progressBar.setVisible(false);
+
+            Throwable ex = task.getException();
+            outputLabel.setText("Error during merge/export. See logs.");
+            log.error("Merge/export failed", ex);
+        });
+
+        Thread t = new Thread(task, "merge-export-task");
+        t.setDaemon(true);
+        t.start();
     }
 
     private FileChooser createFileChooser(String title) {

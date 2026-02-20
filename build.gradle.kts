@@ -1,5 +1,6 @@
 import groovy.json.JsonOutput
 import io.github.fourlastor.construo.Target
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
     java
@@ -7,6 +8,7 @@ plugins {
     id("org.javamodularity.moduleplugin") version "1.8.15"
     id("org.openjfx.javafxplugin") version "0.0.13"
     id("io.github.fourlastor.construo") version "2.1.0"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "github.tilcob.app"
@@ -31,7 +33,7 @@ tasks.withType<JavaCompile> {
 
 application {
     mainModule.set("github.tilcob.app.listmerging")
-    mainClass.set("github.tilcob.app.listmerging.HelloApplication")
+    mainClass.set("github.tilcob.app.listmerging.Launcher")
 }
 
 javafx {
@@ -44,8 +46,9 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
     implementation("com.opencsv:opencsv:5.12.0")
     implementation("org.apache.poi:poi-ooxml:5.5.1")
+    implementation("org.apache.commons:commons-math3:3.6.1")
     implementation("org.slf4j:slf4j-api:2.0.12")
-    implementation("ch.qos.logback:logback-classic:1.4.14")
+    runtimeOnly("ch.qos.logback:logback-classic:1.5.32")
     implementation("com.dlsc.formsfx:formsfx-core:11.6.0") {
         exclude(group = "org.openjfx")
     }
@@ -62,26 +65,16 @@ val appName = "List-Merging"
 construo {
     name.set(appName)
     humanName.set(appName)
+    jarTask.set("shadowJar")
 
     jlink {
-        guessModulesFromJar.set(false)
-        modules.addAll(
-            "java.base",
-            "java.desktop",
-            "java.logging",
-            "jdk.crypto.ec",
-            "jdk.unsupported",
-            "javafx.controls",
-            "javafx.fxml",
-            "javafx.graphics",
-            "com.fasterxml.jackson.databind"
-        )
+        guessModulesFromJar.set(true)
     }
 
     targets {
         create<Target.Windows>("winX64") {
             architecture.set(Target.Architecture.X86_64)
-            icon.set(project.file("icons/logo.png"))
+            //icon.set(project.file("icons/logo.png"))
             jdkUrl.set("https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.15%2B6/OpenJDK17U-jdk_x64_windows_hotspot_17.0.15_6.zip")
         }
 
@@ -137,6 +130,13 @@ val generateIndex by tasks.registering {
     }
 }
 
+
 tasks.named("processResources") {
     dependsOn(generateIndex)
+}
+
+tasks.named<ShadowJar>("shadowJar") {
+    archiveBaseName.set("List-Merging")
+    archiveClassifier.set("")
+    mergeServiceFiles()
 }

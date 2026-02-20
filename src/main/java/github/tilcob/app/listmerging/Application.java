@@ -1,6 +1,5 @@
 package github.tilcob.app.listmerging;
 
-import github.tilcob.app.listmerging.service.HeaderLoader;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
