@@ -36,7 +36,7 @@ public class HeaderLoader {
 
     private void loadBundledHeaders() throws IOException {
         String indexResource = BUNDLED_HEADERS_ROOT + "/index.json";
-        InputStream indexStream = HeaderLoader.class.getClassLoader().getResourceAsStream(indexResource);
+        InputStream indexStream = openBundledResource(indexResource);
         if (indexStream == null) {
             log.warn("No bundled header index found at {}", indexResource);
             return;
@@ -49,7 +49,7 @@ public class HeaderLoader {
 
         for (String fileName : headerFiles) {
             String resourcePath = BUNDLED_HEADERS_ROOT + "/" + fileName;
-            try (InputStream stream = HeaderLoader.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            try (InputStream stream = openBundledResource(resourcePath)) {
                 if (stream == null) {
                     log.warn("Bundled header file listed in index but not found: {}", resourcePath);
                     continue;
@@ -58,6 +58,23 @@ public class HeaderLoader {
                 headers.add(validate(definition, resourcePath));
             }
         }
+    }
+
+    private InputStream openBundledResource(String resourcePath) throws IOException {
+        String normalizedPath = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+
+        InputStream stream = HeaderLoader.class.getResourceAsStream("/" + normalizedPath);
+        if (stream != null) {
+            return stream;
+        }
+
+        ClassLoader classLoader = HeaderLoader.class.getClassLoader();
+        stream = classLoader.getResourceAsStream(normalizedPath);
+        if (stream != null) {
+            return stream;
+        }
+
+        return HeaderLoader.class.getModule().getResourceAsStream(normalizedPath);
     }
 
     private void loadExternalHeaders(Path folder) throws IOException {
