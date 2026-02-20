@@ -112,7 +112,9 @@ public class HeaderLoader {
                 definition.name(),
                 List.copyOf(definition.headers()),
                 aliases,
-                definition.headerPosition());
+                definition.headerPosition(),
+                definition.sumColumn(),
+                definition.sumPattern());
     }
 
     public List<HeaderDefinition> getHeaders() {

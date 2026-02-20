@@ -89,6 +89,52 @@ The application loads headers from **two sources**:
 ```
 `headerPosition` ist optional und erlaubt `FIRST` oder `LAST` (Standard: `FIRST`).
 
+## Working with `Test.zip`
+
+The files in `Test.zip` contain two relevant formats:
+
+- **Piping** (`*.xlsx`) with header `Name; Material; DN; Qty.`
+- **SolidWorks Assembly** (`*.xls`) with header `POS-NR.; NAME; Weight [g]; Quantity`
+
+Important: In the piping export, the test data contains **`Benennunng`** (typo),
+while the standard definition in the project uses `Benennung`. This may cause
+recognition via the exact header to fail.
+
+### Recommendation for `Test.zip` (without code change)
+
+Use external runtime headers (folder `./headers`) and overwrite the
+piping definition with the notation from the test data:
+
+`headers/Piping.json`
+
+```json
+{
+  "name": "Piping",
+  "headers": ["Naming", "Material", "DN", "Pcs."],
+  "headerPosition": "FIRST"
+}
+```
+
+`headers/SolidWorksAssembly.json`
+
+```json
+{
+  "name": "SolidWorks Assembly",
+  "headers": ["POS NO.", "NAME", "Weight [g]", "Quantity"],
+  "headerPosition": "LAST"
+}
+```
+
+Then restart the app and merge the files from `Test.zip` as usual.
+
+### Note on "adding up" a column (e.g. `Pcs.`/`Quantity`)
+
+Current status: The app counts **identical rows** and writes the frequency
+as `Count` in the export. A configurable sum logic via JSON (e.g.
+`add name`/`sumColumn`) is not yet implemented.
+
+Translated with DeepL.com (free version)
+
 ### Option A: Add headers to the project (requires rebuild)
 
 1. Add a new file to `src/main/resources/headers/<name>.json`.

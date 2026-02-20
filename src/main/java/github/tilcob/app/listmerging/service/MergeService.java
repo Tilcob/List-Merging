@@ -201,9 +201,14 @@ public class MergeService {
     }
 
     private List<String> normalizeRow(List<String> row) {
-        return row.stream()
+        List<String> normalized = row.stream()
                 .map(s -> s == null ? "" : s.trim().toLowerCase(Locale.ROOT))
                 .toList();
+        int end = normalized.size();
+        while (end > 0 && normalized.get(end - 1).isBlank()) {
+            end--;
+        }
+        return normalized.subList(0, end);
     }
 
     private boolean isBlankRow(List<String> row) {
@@ -269,14 +274,19 @@ public class MergeService {
             if (normalizedAliases.contains(normalizedFirst)) return def;
         }
 
-        int len = firstRow.size();
+        int firstLen = normalizedFirst.size();
+        int lastLen = normalizedLast.size();
         List<HeaderDefinition> sameLen = headers.stream()
-                .filter(h -> h.headers().size() == len)
-                .filter(h -> h.headerPosition() == HeaderDefinition.HeaderPosition.FIRST)
+                .filter(h -> {
+                    int headerLen = normalizeRow(h.headers()).size();
+                    return h.headerPosition() == HeaderDefinition.HeaderPosition.LAST
+                            ? headerLen == lastLen
+                            : headerLen == firstLen;
+                })
                 .toList();
 
         if (sameLen.size() == 1) return sameLen.get(0);
-        return new HeaderDefinition("Unknown_" + len, List.of());
+        return new HeaderDefinition("Unknown_" + firstLen, List.of());
     }
 
     public enum FileType {
