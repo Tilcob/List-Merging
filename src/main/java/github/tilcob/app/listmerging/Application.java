@@ -14,7 +14,7 @@ public class Application extends javafx.application.Application {
 
         URL fxml = Application.class.getResource("mainView.fxml");
         if (fxml == null) {
-            throw new IllegalStateException("mainView.fxml nicht gefunden (Resource-Pfad stimmt nicht).");
+            throw new IllegalStateException("mainView.fxml not found (resource path is incorrect).");
         }
 
         FXMLLoader fxmlLoader = new FXMLLoader(fxml);

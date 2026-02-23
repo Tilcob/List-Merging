@@ -1,0 +1,19 @@
+{
+  "name": "Piping",
+  "headers": [
+    "Benennung",
+    "Material",
+    "DN",
+    "Stk."
+  ],
+  "headerPosition": "FIRST",
+  "headerAliases": [
+    [
+      "Benennunng",
+      "Material",
+      "DN",
+      "Stk."
+    ]
+  ],
+  "sumColumn": "Stk."
+}

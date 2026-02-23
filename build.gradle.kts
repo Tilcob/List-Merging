@@ -20,7 +20,7 @@ repositories {
     mavenCentral()
 }
 
-val junitVersion = "5.12.1"
+val junitVersion = "5.11.4"
 
 java {
     toolchain {
@@ -49,6 +49,7 @@ dependencies {
     implementation("com.opencsv:opencsv:5.12.0")
     implementation("org.apache.poi:poi-ooxml:5.5.1")
     implementation("org.apache.commons:commons-math3:3.6.1")
+    runtimeOnly("org.apache.logging.log4j:log4j-to-slf4j:2.25.2")
     implementation("org.slf4j:slf4j-api:2.0.12")
     runtimeOnly("ch.qos.logback:logback-classic:1.5.32")
     implementation("com.dlsc.formsfx:formsfx-core:11.6.0") {
