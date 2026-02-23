@@ -89,9 +89,9 @@ The application loads headers from **two sources**:
 ```
 `headerPosition` is optional and accepts `FIRST` or `LAST` (default: `FIRST`).
 
-## Working with `Test.zip`
+## Working with the in-built headers:
 
-The files in `Test.zip` contain two relevant formats:
+The src contain two relevant formats:
 
 - **Piping** (`*.xlsx`) with header `Name; Material; DN; Qty.`
 - **SolidWorks Assembly** (`*.xls`) with header `POS-NR.; NAME; Weight [g]; Quantity`
@@ -100,7 +100,7 @@ Important: In the piping export, the test data contains **`Benennunng`** (typo),
 while the standard definition in the project uses `Benennung`. This may cause
 recognition via the exact header to fail.
 
-### Recommendation for `Test.zip` (without code change)
+### Recommendation (without code change)
 
 Use external runtime headers (folder `./headers`) and overwrite the
 piping definition with the notation from the test data:
@@ -125,7 +125,7 @@ piping definition with the notation from the test data:
 }
 ```
 
-Then restart the app and merge the files from `Test.zip` as usual.
+Then restart the app and merge the files as usual.
 
 ### Note on summing a column (e.g. `Pcs.`/`Quantity`)
 
