@@ -3,7 +3,7 @@ package github.tilcob.app.listmerging.model;
 import java.util.List;
 
 /**
- * Ergebnis einer Validierung inklusive möglicher Probleme.
+ * Result of a validation run including potential issues.
  */
 public record ValidationReport(boolean valid, List<ValidationIssue> issues) {
 
@@ -11,11 +11,11 @@ public record ValidationReport(boolean valid, List<ValidationIssue> issues) {
         issues = issues == null ? List.of() : List.copyOf(issues);
     }
 
-    public static ValidationReport valid() {
+    public static ValidationReport success() {
         return new ValidationReport(true, List.of());
     }
 
-    public static ValidationReport invalid(List<ValidationIssue> issues) {
+    public static ValidationReport failure(List<ValidationIssue> issues) {
         return new ValidationReport(false, issues);
     }
 

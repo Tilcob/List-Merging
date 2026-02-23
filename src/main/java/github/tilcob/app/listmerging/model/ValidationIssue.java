@@ -1,7 +1,7 @@
 package github.tilcob.app.listmerging.model;
 
 /**
- * Einzelnes Validierungsproblem mit stabilem Fehlercode für UI und Logging.
+ * Single validation issue with a stable error code for UI and logging.
  */
 public record ValidationIssue(String code, String message, String headerName, String details) {
 

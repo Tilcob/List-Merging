@@ -87,7 +87,7 @@ The application loads headers from **two sources**:
   "headerPosition": "FIRST"
 }
 ```
-`headerPosition` ist optional und erlaubt `FIRST` oder `LAST` (Standard: `FIRST`).
+`headerPosition` is optional and accepts `FIRST` or `LAST` (default: `FIRST`).
 
 ## Working with `Test.zip`
 
@@ -127,13 +127,11 @@ piping definition with the notation from the test data:
 
 Then restart the app and merge the files from `Test.zip` as usual.
 
-### Note on "adding up" a column (e.g. `Pcs.`/`Quantity`)
+### Note on summing a column (e.g. `Pcs.`/`Quantity`)
 
-Current status: The app counts **identical rows** and writes the frequency
-as `Count` in the export. A configurable sum logic via JSON (e.g.
-`add name`/`sumColumn`) is not yet implemented.
-
-Translated with DeepL.com (free version)
+Current status: the app counts **identical rows** and writes the frequency
+as `Count` in the export. Configurable sum logic through JSON is supported via
+`sumColumn` (and optionally `sumPattern`) in header definitions.
 
 ### Option A: Add headers to the project (requires rebuild)
 

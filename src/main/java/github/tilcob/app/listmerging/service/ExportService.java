@@ -54,7 +54,7 @@ public class ExportService {
                     }
                     headerRow.createCell(c++).setCellValue("Count");
                     if (sumColumnIndex >= 0) {
-                        headerRow.createCell(c).setCellValue(headerDef.sumColumn() + "_SUM");
+                        headerRow.createCell(c).setCellValue(headerDef.sumColumn());
                     }
                 }
 

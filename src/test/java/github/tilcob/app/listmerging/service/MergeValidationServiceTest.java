@@ -1,11 +1,7 @@
 package github.tilcob.app.listmerging.service;
 
 import com.opencsv.exceptions.CsvException;
-import github.tilcob.app.listmerging.model.AggregationResult;
-import github.tilcob.app.listmerging.model.HeaderDefinition;
-import github.tilcob.app.listmerging.model.ValidationContext;
-import github.tilcob.app.listmerging.model.ValidationIssue;
-import github.tilcob.app.listmerging.model.ValidationReport;
+import github.tilcob.app.listmerging.model.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

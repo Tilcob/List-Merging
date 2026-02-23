@@ -1,11 +1,7 @@
 package github.tilcob.app.listmerging.tasks;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import github.tilcob.app.listmerging.model.AggregationResult;
-import github.tilcob.app.listmerging.model.HeaderDefinition;
-import github.tilcob.app.listmerging.model.ValidationContext;
-import github.tilcob.app.listmerging.model.ValidationIssue;
-import github.tilcob.app.listmerging.model.ValidationReport;
+import github.tilcob.app.listmerging.model.*;
 import github.tilcob.app.listmerging.service.ExportService;
 import github.tilcob.app.listmerging.service.HeaderLoader;
 import github.tilcob.app.listmerging.service.MergeService;
@@ -103,7 +99,7 @@ public class MergeExportTask extends Task<File> {
             if (continueOnValidationErrors) {
                 updateMessage(validationSummary + " – continuing in warning mode.");
             } else {
-                throw new IllegalStateException(validationSummary + " Export abgebrochen.");
+                throw new IllegalStateException(validationSummary + " Export aborted.");
             }
         }
 
@@ -131,7 +127,7 @@ public class MergeExportTask extends Task<File> {
             log.info("Merge validation completed: valid={}, issues={}", report.valid(), report.issues().size());
             return report;
         } catch (RuntimeException ex) {
-            throw new IllegalStateException("Validierung fehlgeschlagen. Export wird aus Sicherheitsgründen abgebrochen.", ex);
+            throw new IllegalStateException("Validation failed. Export is aborted for safety reasons.", ex);
         }
     }
 
@@ -143,10 +139,10 @@ public class MergeExportTask extends Task<File> {
 
     private String toStatusSummary(ValidationReport report) {
         if (report == null) {
-            return "Validierung: kein Ergebnis verfügbar.";
+            return "Validation: no result available.";
         }
         if (report.valid()) {
-            return "Validierung: OK (0 Auffälligkeiten).";
+            return "Validation: OK (0 issues).";
         }
 
         String topIssues = report.issues().stream()
@@ -154,7 +150,7 @@ public class MergeExportTask extends Task<File> {
                 .map(this::toReadableIssue)
                 .collect(Collectors.joining(" | "));
         String suffix = report.issues().size() > VALIDATION_MESSAGE_LIMIT ? " | …" : "";
-        return "Validierung: FEHLER (" + report.issues().size() + " Auffälligkeiten). " + topIssues + suffix;
+        return "Validation: ERROR (" + report.issues().size() + " issues). " + topIssues + suffix;
     }
 
     private String toReadableIssue(ValidationIssue issue) {

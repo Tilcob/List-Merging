@@ -22,7 +22,7 @@ import java.util.stream.IntStream;
 
 public class MergeService {
     private static final Logger log = LoggerFactory.getLogger(MergeService.class);
-    private static final Pattern DEFAULT_SUM_PATTERN = Pattern.compile("(\\d+[\\.,]?\\d*)");
+    private static final Pattern DEFAULT_SUM_PATTERN = Pattern.compile("(\\d+[.,]?\\d*)");
 
     public Map<HeaderDefinition, Map<List<String>, AggregationResult>> merge(List<File> files, List<HeaderDefinition> headers)
             throws IOException, CsvException {

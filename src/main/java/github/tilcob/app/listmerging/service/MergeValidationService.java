@@ -3,17 +3,8 @@ package github.tilcob.app.listmerging.service;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvException;
-import github.tilcob.app.listmerging.model.AggregationResult;
-import github.tilcob.app.listmerging.model.HeaderDefinition;
-import github.tilcob.app.listmerging.model.ValidationContext;
-import github.tilcob.app.listmerging.model.ValidationIssue;
-import github.tilcob.app.listmerging.model.ValidationReport;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
+import github.tilcob.app.listmerging.model.*;
+import org.apache.poi.ss.usermodel.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,14 +14,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -56,8 +40,8 @@ public class MergeValidationService {
 
         if (merged == null || merged.isEmpty()) {
             log.warn("Merge validation called with empty merged result.");
-            issues.add(new ValidationIssue("EMPTY_MERGED_DATA", "Keine aggregierten Daten für die Validierung vorhanden."));
-            return ValidationReport.invalid(issues);
+            issues.add(new ValidationIssue("EMPTY_MERGED_DATA", "No aggregated data available for validation."));
+            return ValidationReport.failure(issues);
         }
 
         log.info("Start merge validation for {} header groups.", merged.size());
@@ -71,7 +55,7 @@ public class MergeValidationService {
                 log.warn("Invalid header group detected: header or header name is missing.");
                 issues.add(new ValidationIssue(
                         "INVALID_HEADER",
-                        "Header darf nicht null sein und muss einen Namen enthalten.",
+                        "Header must not be null and must contain a name.",
                         headerName,
                         "header=" + header
                 ));
@@ -82,7 +66,7 @@ public class MergeValidationService {
                 log.warn("Header '{}' has null grouped rows.", headerName);
                 issues.add(new ValidationIssue(
                         "EMPTY_GROUP",
-                        "Für den Header wurden keine Gruppendaten gefunden.",
+                        "No grouped data was found for this header.",
                         headerName,
                         "groupedRows=null"
                 ));
@@ -100,7 +84,7 @@ public class MergeValidationService {
                     log.warn("Header '{}' has null aggregation for key {}.", headerName, key);
                     issues.add(new ValidationIssue(
                             "NULL_AGGREGATION",
-                            "AggregationResult darf nicht null sein.",
+                            "AggregationResult must not be null.",
                             headerName,
                             "key=" + key
                     ));
@@ -111,7 +95,7 @@ public class MergeValidationService {
                     log.warn("Header '{}' has invalid rowCount {} for key {}.", headerName, aggregation.rowCount(), key);
                     issues.add(new ValidationIssue(
                             "INVALID_ROW_COUNT",
-                            "AggregationResult.rowCount muss >= 1 sein.",
+                            "AggregationResult.rowCount must be >= 1.",
                             headerName,
                             "key=" + key + ", rowCount=" + aggregation.rowCount()
                     ));
@@ -121,7 +105,7 @@ public class MergeValidationService {
                     log.warn("Header '{}' has null sumValue for key {}.", headerName, key);
                     issues.add(new ValidationIssue(
                             "NULL_SUM_VALUE",
-                            "AggregationResult.sumValue darf nicht null sein.",
+                            "AggregationResult.sumValue must not be null.",
                             headerName,
                             "key=" + key
                     ));
@@ -143,7 +127,7 @@ public class MergeValidationService {
 
         boolean valid = issues.isEmpty();
         log.info("Merge validation finished. valid={}, issues={}", valid, issues.size());
-        return valid ? ValidationReport.valid() : ValidationReport.invalid(issues);
+        return valid ? ValidationReport.success() : ValidationReport.failure(issues);
     }
 
     private void validateRowCount(HeaderDefinition header,
@@ -158,7 +142,7 @@ public class MergeValidationService {
                     context,
                     issues,
                     "MISSING_EXPECTED_ROW_COUNT",
-                    "Kein Sollwert für die erwartete Zeilenanzahl vorhanden.",
+                    "No expected value is configured for row count.",
                     metricsHeaderName
             );
             return;
@@ -171,7 +155,7 @@ public class MergeValidationService {
                     actualRowCount);
             issues.add(new ValidationIssue(
                     ValidationIssue.COUNT_MISMATCH,
-                    "Datenzeilen-Anzahl entspricht nicht dem erwarteten Wert.",
+                    "Data row count does not match the expected value.",
                     metricsHeaderName,
                     "expected=" + expectedRowCount + ", actual=" + actualRowCount
             ));
@@ -198,7 +182,7 @@ public class MergeValidationService {
                     context,
                     issues,
                     "MISSING_EXPECTED_SUM",
-                    "Kein Sollwert für die erwartete Summe vorhanden.",
+                    "No expected value is configured for sum.",
                     metricsHeaderName
             );
             return;
@@ -217,7 +201,7 @@ public class MergeValidationService {
                     delta);
             issues.add(new ValidationIssue(
                     ValidationIssue.SUM_MISMATCH,
-                    "Summenprüfung fehlgeschlagen.",
+                    "Sum validation failed.",
                     metricsHeaderName,
                     "expected=" + scaledExpected
                             + ", actual=" + scaledActual
@@ -251,7 +235,7 @@ public class MergeValidationService {
         } catch (IOException | CsvException e) {
             issues.add(new ValidationIssue(
                     "REFERENCE_PATH_ERROR",
-                    "Referenz-Aggregation konnte nicht berechnet werden.",
+                    "Reference aggregation could not be calculated.",
                     null,
                     e.getMessage()
             ));
@@ -332,7 +316,7 @@ public class MergeValidationService {
                 if (mergedValue == null) {
                     issues.add(new ValidationIssue(
                             "REFERENCE_MISSING_KEY",
-                            "Schlüssel fehlt im Merge-Ergebnis.",
+                            "Key is missing in merge result.",
                             headerName,
                             "missingKey=" + key
                     ));
@@ -342,7 +326,7 @@ public class MergeValidationService {
                 if (referenceValue.rowCount() != mergedValue.rowCount()) {
                     issues.add(new ValidationIssue(
                             "REFERENCE_COUNT_MISMATCH",
-                            "Abweichende Anzahl für denselben Schlüssel.",
+                            "Different count for the same key.",
                             headerName,
                             "key=" + key
                                     + ", referenceCount=" + referenceValue.rowCount()
@@ -359,7 +343,7 @@ public class MergeValidationService {
                 if (delta.compareTo(context.sumTolerance()) > 0) {
                     issues.add(new ValidationIssue(
                             "REFERENCE_SUM_MISMATCH",
-                            "Abweichende Summe für denselben Schlüssel.",
+                            "Different sum for the same key.",
                             headerName,
                             "key=" + key
                                     + ", referenceSum=" + referenceSum
@@ -513,7 +497,7 @@ public class MergeValidationService {
             if (i == sumColumnIndex) {
                 continue;
             }
-            if (keyBuilder.length() > 0) {
+            if (!keyBuilder.isEmpty()) {
                 keyBuilder.append(KEY_SEPARATOR);
             }
             keyBuilder.append(normalizeCell(normalized.get(i)));

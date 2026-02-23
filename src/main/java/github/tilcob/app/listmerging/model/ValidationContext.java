@@ -5,16 +5,16 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Kontext mit Soll-Werten und Vergleichsparametern für die Merge-Validierung.
+ * Context containing expected values and comparison parameters for merge validation.
  * <p>
- * Für jeden Headernamen kann ein {@link ExpectedMetrics} hinterlegt werden. Fehlt ein Sollwert für
- * Zeilenanzahl oder Summe, wird das Verhalten über {@code treatMissingExpectationsAsWarning} gesteuert:
+ * An {@link ExpectedMetrics} entry can be stored for each header name. If an expected row count or
+ * expected sum is missing, behavior is controlled by {@code treatMissingExpectationsAsWarning}:
  * </p>
  * <ul>
- *   <li>{@code true}: fehlende Sollwerte werden als Warnung betrachtet und nur geloggt; die Validierung
- *   bleibt dadurch nicht automatisch ungültig.</li>
- *   <li>{@code false}: fehlende Sollwerte werden als Fehler behandelt und als {@link ValidationIssue}
- *   in den Report aufgenommen.</li>
+ *   <li>{@code true}: missing expectations are treated as warnings and only logged; validation does
+ *  not automatically become invalid.</li>
+ *  <li>{@code false}: missing expectations are treated as errors and added as {@link ValidationIssue}
+ *  entries to the report.</li>
  * </ul>
  */
 public record ValidationContext(Map<String, ExpectedMetrics> expectedMetricsByHeader,
@@ -43,11 +43,11 @@ public record ValidationContext(Map<String, ExpectedMetrics> expectedMetricsByHe
     }
 
     public Optional<Integer> expectedRowsFor(String headerName) {
-        return metricsFor(headerName).flatMap(ExpectedMetrics::expectedRowCount);
+        return metricsFor(headerName).flatMap(metrics -> Optional.ofNullable(metrics.expectedRowCount()));
     }
 
     public Optional<BigDecimal> expectedSumFor(String headerName) {
-        return metricsFor(headerName).flatMap(ExpectedMetrics::expectedTotalSum);
+        return metricsFor(headerName).flatMap(metrics -> Optional.ofNullable(metrics.expectedTotalSum()));
     }
 
     public record ExpectedMetrics(Integer expectedRowCount,
@@ -57,14 +57,6 @@ public record ValidationContext(Map<String, ExpectedMetrics> expectedMetricsByHe
             if (expectedRowCount != null && expectedRowCount < 0) {
                 throw new IllegalArgumentException("expectedRowCount must be >= 0");
             }
-        }
-
-        public Optional<Integer> expectedRowCount() {
-            return Optional.ofNullable(expectedRowCount);
-        }
-
-        public Optional<BigDecimal> expectedTotalSum() {
-            return Optional.ofNullable(expectedTotalSum);
         }
     }
 }
